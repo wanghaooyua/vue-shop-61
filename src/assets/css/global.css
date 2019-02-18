@@ -1,11 +1,31 @@
-html,body,#app{
-    height: 100%;
-    margin: 0;
-    padding: 0;
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+  padding: 0;
 }
-.el-submenu__title,.el-menu-item {
-    font-size: 13px;
+.el-submenu__title,
+.el-menu-item {
+  font-size: 13px;
 }
-.iconfont{
-    margin-right: 10px
+/* 给左侧图标设置样式 */
+.iconfont {
+  margin-right: 10px;
+}
+/* 给卡片区域设置样式 */
+.box-card {
+  margin-top: 15px;
+  box-shadow: 0 1px 1px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* 给el-table表格设置样式 */
+.el-table {
+  margin-top: 15px;
+  font-size: 12px;
+}
+/* 给分页设置样式 */
+.el-pagination {
+  margin-top: 15px;
+  font-size: 12px;
 }
