@@ -6,7 +6,7 @@
       <el-breadcrumb-item>用户列表</el-breadcrumb-item>
     </el-breadcrumb>
     <el-card class="box-card">
-      <!-- Row 组件 提供 gutter 属性来指定每一栏之间的间隔，默认间隔为 0。 -->
+      <!-- Row 组件 提供 gutter 属性来指定每一栏之间的间隔，默认间隔为。 -->
       <el-row :gutter="20">
         <!-- 通过 col 组件的 span 属性我们就可以自由地组合布局。 -->
         <el-col :span="8">
@@ -54,7 +54,12 @@
               @click="delUser(info.row.id)"
             ></el-button>
             <el-tooltip content="分配角色" placement="top" :enterable="false">
-              <el-button type="warning" icon="el-icon-setting" size="mini"></el-button>
+              <el-button
+                type="warning"
+                icon="el-icon-setting"
+                size="mini"
+                @click="showFenpeiDialog(info.row.id)"
+              ></el-button>
             </el-tooltip>
           </template>
         </el-table-column>
@@ -116,6 +121,37 @@
           <el-button type="primary" @click="editUser">确 定</el-button>
         </span>
       </el-dialog>
+
+      <!-- 分配角色的弹框-->
+      <el-dialog
+        title="用户分配角色"
+        :visible.sync="fenpeiDialogVisible"
+        width="50%"
+        @close="fenpeiDialogClose"
+      >
+        <el-form
+          :rules="fenpeiFormRoles"
+          ref="fenpeiFormRef"
+          :model="fenpeiForm"
+          label-width="130px"
+        >
+          <el-form-item label="当前的用户" prop="username">{{fenpeiForm.username}}</el-form-item>
+          <el-form-item label="分配新角色" prop="rid">
+            <el-select v-model="fenpeiForm.rid" placeholder="请选择">
+              <el-option
+                v-for="item in roleInfos"
+                :key="item.id"
+                :label="item.roleName"
+                :value="item.id"
+              ></el-option>
+            </el-select>
+          </el-form-item>
+        </el-form>
+        <span slot="footer" class="dialog-footer">
+          <el-button @click="fenpeiDialogVisible = false">取 消</el-button>
+          <el-button type="primary" @click="fenpeiUser">确 定</el-button>
+        </span>
+      </el-dialog>
     </el-card>
   </div>
 </template>
@@ -126,6 +162,38 @@ export default {
     this.getUserInfors()
   },
   methods: {
+    // 分配用户权限
+    // 关闭弹框后重置form表单
+    fenpeiDialogClose() {
+      this.$refs.fenpeiFormRef.resetFields()
+    },
+    async fenpeiUser(id) {
+      const { data: res } = await this.$http.put(
+        'users/' + this.fenpeiForm.id + '/role',
+        this.fenpeiForm
+      )
+      if (res.meta.status !== 200) {
+        return this.$message.error(res.meta.msg)
+      }
+      this.fenpeiDialogVisible = false
+      this.$message.success(res.meta.msg)
+      this.getUserInfors()
+    },
+    // 点击修改权限按钮弹出弹框
+    async showFenpeiDialog(id) {
+      this.fenpeiDialogVisible = true
+      const { data: res } = await this.$http.get('users/' + id)
+      if (res.meta.status !== 200) {
+        return this.$message.error(res.meta.msg)
+      }
+      this.fenpeiForm = res.data
+      const { data: res2 } = await this.$http.get('roles')
+      if (res2.meta.status !== 200) {
+        return this.$message.error(res2.meta.msg)
+      }
+      this.roleInfos = res2.data
+    },
+
     // 修改用户信息
     async showEditDialog(id) {
       this.editDialogVisible = true
@@ -138,17 +206,21 @@ export default {
     editDialogClose() {
       this.$refs.editFormRef.resetFields()
     },
-    async editUser() {
-      const { data: res } = await this.$http.put(
-        'users/' + this.editForm.id,
-        this.editForm
-      )
-      if (res.meta.status !== 200) {
-        return this.$message.error(res.meta.msg)
-      }
-      this.editDialogVisible = false
-      this.$message.success(res.meta.msg)
-      this.getUserInfors()
+    editUser() {
+      this.$refs.editFormRef.validate(async valid => {
+        if (valid) {
+          const { data: res } = await this.$http.put(
+            'users/' + this.editForm.id,
+            this.editForm
+          )
+          if (res.meta.status !== 200) {
+            return this.$message.error(res.meta.msg)
+          }
+          this.editDialogVisible = false
+          this.$message.success(res.meta.msg)
+          this.getUserInfors()
+        }
+      })
     },
 
     // 删除用户
@@ -165,6 +237,15 @@ export default {
             return this.$message.error(res.meta.msg)
           }
           this.$message.success(res.meta.msg)
+          // 当删除一个页面只有一个用户时候，比如，
+          // 第二页只有一个用户，当把这个用户删除之后，调用重新加载用户列表的函数，页面直接显示空数据了
+          // 此时，页面重新加载数据时，对应的当前页码条件参数的值仍然为"2",而第2页已经没有数据了，所以页面显示空白
+          // 解决：
+          // 判断当前页码如果只有一条数据并且不是第1页，并且这个数据还被删除了，那么重新加载数据时，页码请给予减少1位操作
+          if (this.userInfors.length === 1 && this.queryParams.pagenum > 1) {
+            // this.userInfors.length  打印的是当前页面删除前有几个数据
+            this.queryParams.pagenum--
+          }
           this.getUserInfors()
         })
         .catch(() => {})
@@ -240,6 +321,18 @@ export default {
       callback()
     }
     return {
+      // 分配用户角色
+      // Dialog弹框是否显示，false：隐藏
+      fenpeiDialogVisible: false,
+      roleInfos: [],
+      fenpeiForm: {
+        username: '',
+        rid: ''
+      },
+      fenpeiFormRoles: {
+        rid: [{ required: true, message: '角色必须选择', trigger: 'change' }]
+      },
+
       // Dialog弹框是否显示，false：隐藏
       editDialogVisible: false,
       // 修改用户的数据表单部分
